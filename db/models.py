@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text, Float
+from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Text, Float, UniqueConstraint
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.dialects.postgresql import JSONB
 import datetime
@@ -59,3 +59,13 @@ class NotificationSent(Base):
     user_id = Column(Integer)
     listing_id = Column(String)
     sent_at = Column(DateTime(timezone=True), default=datetime.datetime.now(datetime.timezone.utc))
+
+class SentAd(Base):
+    __tablename__ = "sent_ads"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, nullable=False)
+    ad_url = Column(String, nullable=False)
+    sent_at = Column(DateTime(timezone=True), default=datetime.datetime.now(datetime.timezone.utc))
+
+    __table_args__ = (UniqueConstraint("user_id", "ad_url", name="uix_user_ad"),)
