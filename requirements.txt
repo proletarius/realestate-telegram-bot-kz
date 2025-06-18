@@ -5,3 +5,4 @@ apscheduler
 aiohttp
 beautifulsoup4
 sqlalchemy
+unidecode
