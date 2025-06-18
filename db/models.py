@@ -13,7 +13,7 @@ class User(Base):
     username = Column(String, nullable=True)
     is_premium = Column(Boolean, default=False)
     subscription_until = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=datetime.datetime.now(datetime.timezone.utc))
 
     preferences = relationship("Preference", back_populates="user")
 
@@ -23,14 +23,14 @@ class Preference(Base):
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
-    city = Column(String)
-    min_price = Column(Integer)
-    max_price = Column(Integer)
-    rooms = Column(Integer)
+    city = Column(String, nullable=False)
+    operation_type = Column(String, nullable=False)  # аренда / покупка
+    max_price = Column(Integer, nullable=False)
+    rooms = Column(Integer, nullable=False)
     districts = Column(JSONB)  # Список районов
-    property_type = Column(String)  # "flat" / "house"
+    property_type = Column(String, nullable=False)  # "flat" / "house"
 
-    created_at = Column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=datetime.datetime.now(datetime.timezone.utc))
 
     user = relationship("User", back_populates="preferences")
 
@@ -49,7 +49,7 @@ class Listing(Base):
     photo_url = Column(String, nullable=True)
     date_published = Column(DateTime)
     raw_data = Column(JSONB)
-    created_at = Column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=datetime.datetime.now(datetime.timezone.utc))
 
 
 class NotificationSent(Base):
@@ -58,4 +58,4 @@ class NotificationSent(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer)
     listing_id = Column(String)
-    sent_at = Column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
+    sent_at = Column(DateTime(timezone=True), default=datetime.datetime.now(datetime.timezone.utc))
