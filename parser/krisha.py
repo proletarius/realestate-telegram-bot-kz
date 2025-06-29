@@ -3,6 +3,12 @@ from bs4 import BeautifulSoup
 from urllib.parse import urlencode
 import re
 import unidecode
+import logging
+from bot.utils.logging import setup_logging  # обновлённая функция логирования
+
+# Настройка логов и конфигурации
+setup_logging()
+logger = logging.getLogger(__name__)
 
 BASE_URL = "https://krisha.kz"
 
@@ -25,9 +31,7 @@ def normalize_city(city: str) -> str:
     if city in CITY_MAP:
         return CITY_MAP[city]
 
-    # Транслитерация кириллицы → латиница
     latin_city = unidecode.unidecode(city)
-    # Удалим лишние символы
     latin_city = re.sub(r"[^a-z0-9-]", "", latin_city)
     return latin_city or "astana"
 
@@ -43,40 +47,61 @@ async def fetch_html(url):
         async with session.get(url) as resp:
             return await resp.text()
 
-
-def build_search_url(city, operation_type, property_type, rooms, max_price):
+def build_search_url(city, operation_type, property_type, rooms, max_price, search_text=None, year_built=None, land_type=None):
     operation_map = {
         "аренда": "arenda",
         "покупка": "prodazha"
     }
 
-    property_map = {
-            "квартира": "kvartiry",
-            "дом": "doma"
-        }
-
-    op = operation_map.get(operation_type.lower(), "arenda")
-    prop = property_map.get(property_type.lower(), "kvartiry")
     city_slug = normalize_city(city)
+    op = operation_map.get(operation_type.lower(), "arenda")
+    prop = "doma-dachi" if property_type == "дом" else "kvartiry"
 
+    query = {}
 
-    query = {
-        "das[rooms]": rooms,
-        "das[price][to]": max_price
-    }
- 
-    return f"{BASE_URL}/{op}/{prop}/{city_slug}/?{urlencode(query)}"
+    if max_price is not None:
+        query["das[price][to]"] = max_price
 
+    if rooms is not None:
+        if property_type == "дом":
+            query["das[live.rooms]"] = rooms
+        else:
+            query["das[rooms]"] = rooms
 
-async def parse_krisha(city, operation_type, property_type, rooms, max_price):
-    url = build_search_url(city, operation_type, property_type, rooms, max_price)
-    print("🔗 URL:", url)
+    if year_built and property_type == "дом":
+        query["das[house.year][from]"] = year_built
+
+    txt_parts = []
+    if land_type == "ИЖС" and property_type == "дом":
+        txt_parts.append("ИЖС")
+
+    if search_text:
+        txt_parts.extend(search_text.strip().split())
+
+    manual_keywords = txt_parts[1:] if txt_parts else []
+
+    if txt_parts:
+        query["_txt_"] = txt_parts[0]  # Только первое слово — для Krisha
+
+    url = f"{BASE_URL}/{op}/{prop}/{city_slug}/?{urlencode(query)}"
+    return url, manual_keywords
+
+async def parse_krisha(city, operation_type, property_type, rooms, max_price, search_text=None, year_built=None, land_type=None):
+    url, manual_keywords = build_search_url(city, operation_type, property_type, rooms, max_price, search_text, year_built, land_type)
+    logger.info("🔗 Krisha URL: %s", url)
 
     html = await fetch_html(url)
-    soup = BeautifulSoup(html, "html.parser")
+    if not html:
+        logger.error("❌ Пустой HTML с URL: %s", url)
+        return []
 
+    soup = BeautifulSoup(html, "html.parser")
     cards = soup.select("div.a-card")
-    print(f"🔍 Найдено карточек: {len(cards)}")
+
+    if not cards:
+        logger.error("❌ Krisha не вернула ни одной карточки! Возможно, сайт изменился или фильтр слишком узкий.")
+    else:
+        logger.info("🔍 Найдено карточек: %d", len(cards))
 
     items = []
     for card in cards:
@@ -96,6 +121,11 @@ async def parse_krisha(city, operation_type, property_type, rooms, max_price):
             relative_url = title_el.get("href", "")
             full_url = BASE_URL + relative_url if relative_url.startswith("/") else relative_url
 
+            full_text = f"{title.lower()} {description.lower()}"
+
+            if manual_keywords and not all(kw.lower() in full_text for kw in manual_keywords):
+                continue
+
             items.append({
                 "title": title,
                 "price": price,
@@ -103,26 +133,10 @@ async def parse_krisha(city, operation_type, property_type, rooms, max_price):
                 "address": address,
                 "description": description
             })
+
         except Exception as e:
-            print("⚠️ Ошибка при парсинге объявления:", e)
+            logger.warning("⚠️ Ошибка при парсинге карточки: %s", e)
             continue
 
+    logger.info("✅ Отобрано %d карточек по фильтру", len(items))
     return items
-
-"""
-if __name__ == "__main__":
-    import asyncio
-    results = asyncio.run(parse_krisha(
-        city="Алматы",
-        operation_type="покупка",
-        property_type="квартира",
-        rooms=3,
-        max_price=1500000
-    ))
-
-    for r in results:
-        print(f"{r['price']} — {r['title']}")
-        print(f"{r['address']}")
-        print(f"{r['url']}")
-        print(f"{r['description']}\n")
-"""

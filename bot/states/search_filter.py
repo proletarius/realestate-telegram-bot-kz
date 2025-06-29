@@ -6,3 +6,6 @@ class SearchFilter(StatesGroup):
     max_price = State()
     rooms = State()
     property_type = State()
+    land_type = State()       # только для домов
+    year_built = State()      # только для домов
+    search_text = State()

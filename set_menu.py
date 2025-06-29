@@ -19,6 +19,7 @@ async def set_bot_commands():
     commands = [
         BotCommand(command="start", description="🔍 Начать поиск"),
         BotCommand(command="filter", description="⚙️ Изменить фильтр"),
+        BotCommand(command="myfilter", description="🔎 Посмотреть текущий фильтр"),
         BotCommand(command="subscribe", description="💳 Подписка"),
         BotCommand(command="help", description="📘 Помощь"),
     ]
